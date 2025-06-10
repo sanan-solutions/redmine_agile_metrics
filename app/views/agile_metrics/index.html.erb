@@ -1,0 +1,47 @@
+<% html_title l(:label_agile_board) %>
+<% content_for :header_tags do %>
+ <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <%= stylesheet_link_tag "agile_metrics.css", plugin: "redmine_agile_metrics", media: "all" %>
+<% end %>
+
+<h1>Agile Metrics Dashboard</h1>
+
+<div class="agile-metrics-tabs">
+  <ul>
+    <li class="selected"><a href="#tab-by-sprints">Metrics By Sprints</a></li>
+    <li><a href="#tab-by-filter">Metrics By Filter</a></li>
+  </ul>
+</div>
+
+<div class="metrics-tab-content" id="tab-by-sprints" style="display:none;">
+  <%= render partial: 'agile_metrics/metrics/by_sprint' %>
+</div>
+
+<div class="metrics-tab-content" id="tab-by-filter" style="display:none;">
+  <%= render partial: 'agile_metrics/metrics/by_filter' %>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const tabs = document.querySelectorAll(".agile-metrics-tabs a");
+    const contents = document.querySelectorAll(".metrics-tab-content");
+
+    tabs.forEach(tab => {
+      tab.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        // Remove active state
+        document.querySelector(".agile-metrics-tabs .selected")?.classList.remove("selected");
+        tab.parentElement.classList.add("selected");
+
+        // Hide all tabs
+        contents.forEach(c => c.style.display = "none");
+
+        // Show selected tab
+        const targetId = tab.getAttribute("href");
+        document.querySelector(targetId).style.display = "block";
+      });
+    });
+  });
+</script>

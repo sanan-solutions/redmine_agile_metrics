@@ -1,0 +1,72 @@
+<div class="metrics-by-filter">
+  <h2>Metrics By Filter</h2>
+
+  <div class="metrics-group">
+    <h2 class="metrics-group__title">Quanlity</h2>
+    <div class="metrics-group__charts">
+      <div class="chart">
+        <h3>Total Bugs By Priority</h3>
+        <canvas id="bug-priority-chart" width="400" height="400"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Total Bugs By Features</h3>
+        <canvas id="bug-feature-chart" width="400" height="400"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Total Bugs By Status</h3>
+        <canvas id="bug-status-chart" width="400" height="400"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Total Bugs By Problem Category</h3>
+        <canvas id="bug-feature-chart" width="400" height="400"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Total Bugs By Root Causal Category</h3>
+        <canvas id="bug-feature-chart" width="400" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function createCountBugByIssueChart() {
+    const bugPriorityLabels = <%= raw @bug_priority_labels.to_json %>;
+    const bugPriorityData = <%= raw @bug_priority_counts.to_json %>;
+
+    new Chart(document.getElementById('bug-priority-chart'), {
+      type: 'doughnut',
+      data: {
+        labels: bugPriorityLabels,
+        datasets: [{
+          label: 'Bug Count',
+          data: bugPriorityData,
+          backgroundColor: [
+            '#FF6384', '#36A2EB', '#FFCE56', '#8BC34A', '#FF9800', '#9C27B0'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        plugins: {
+          legend: {
+            position: 'right'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.label}: ${context.parsed} bugs`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  createCountBugByIssueChart()
+</script>

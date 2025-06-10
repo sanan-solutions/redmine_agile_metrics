@@ -1,0 +1,171 @@
+<div class="metrics-by-sprint">
+  <h2>Metrics By Sprint</h2>
+
+  <div class="filters-group">
+    <%= form_with url: request.path, method: :get, local: true do |f| %>
+      <label for="version_id">Chọn Sprint:</label>
+      <%= select_tag :version_id,
+        options_from_collection_for_select(@versions, :id, :name, @selected_version_id),
+        onchange: "this.form.submit();" %>
+    <% end %>
+  </div>
+
+  <div class="metrics-group">
+    <h2 class="metrics-group__title">Performance</h2>
+    <div class="metrics-group__charts">
+      <div class="chart">
+        <h3>Velocity Chart</h3>
+        <canvas id="velocity-chart" width="600" height="400"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Issue Status In Sprint "<%= @selected_version&.name || 'Không có' %>"</h3>
+        <canvas id="status-pie-chart" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Burndown</h3>
+        <canvas id="burndown-chart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-group">
+    <h2 class="metrics-group__title">Quanlity</h2>
+
+    <div class="metrics-group__charts">
+      <div class="chart">
+        <h3>Bug Rate By Sprint (Total bugs/Total Story point completed)</h3>
+        <canvas id="velocity-chart" width="600" height="400"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Bug Count By State</h3>
+        <canvas id="status-issue-by-sprint-pie-chart" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Total Bugs By Problem Category</h3>
+        <canvas id="status-issue-by-sprint-pie-chart" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Total Bugs By Root Causal Category</h3>
+        <canvas id="status-issue-by-sprint-pie-chart" width="300" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function renderVelocityChart() {
+    const data = <%= raw @velocity_data.to_json %>;
+
+    console.log("data", data)
+    const labels = data.map(d => d.version);
+    const total = data.map(d => d.total);
+    const completed = data.map(d => d.completed);
+    const bugs = data.map(d => d.bug_count);
+    const bugRates = data.map(d => {
+      return d.total > 0 ? (d.completed / d.total * 100).toFixed(2) : 0;
+    });
+
+    new Chart(document.getElementById('velocity-chart'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Commitment',
+            data: total,
+            backgroundColor: 'rgba(200, 200, 200, 0.5)',
+            yAxisID: 'y',
+            barThickness: 40
+          },
+          {
+            label: 'Work Completed',
+            data: completed,
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            yAxisID: 'y',
+            barThickness: 40
+          },
+          {
+            label: 'Bug Rate (%)',
+            data: bugRates,
+            type: 'line',
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            yAxisID: 'y1',
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Story Points' }
+          },
+          y1: {
+            beginAtZero: true,
+            position: 'right',
+            title: { display: true, text: 'Bug Rate (%)' },
+            ticks: {
+              callback: function(value) {
+                return value + '%';
+              }
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const label = context.dataset.label || '';
+                return label === 'Bug Rate (%)'
+                  ? `${label}: ${context.raw}%`
+                  : `${label}: ${context.raw}`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+  
+  function renderIssueStatusDistributionChart() {
+    // Pie Chart: Issue status distribution
+    const issueStatusData = <%= raw @issue_status_data.to_json %>;
+    if (issueStatusData.length > 0) {
+      const statusLabels = issueStatusData.map(i => i.name);
+      const statusCounts = issueStatusData.map(i => i.count);
+      const pieColors = ['#4caf50', '#f44336', '#2196f3', '#ff9800', '#9c27b0', '#607d8b'];
+
+      console.log("he", statusLabels, statusCounts)
+      new Chart(document.getElementById('status-pie-chart'), {
+        type: 'pie',
+        data: {
+          labels: statusLabels,
+          datasets: [{
+            data: statusCounts,
+            backgroundColor: pieColors
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Issue Status Distribution'
+            }
+          }
+        }
+      });
+    }
+  }
+
+  renderVelocityChart()
+  renderIssueStatusDistributionChart()
+
+</script>

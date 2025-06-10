@@ -1,0 +1,49 @@
+.agile-metrics-tabs {
+  margin-bottom: 10px;
+}
+.agile-metrics-tabs ul {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  border-bottom: 2px solid #ccc;
+}
+.agile-metrics-tabs li {
+  margin-right: 10px;
+}
+.agile-metrics-tabs li.selected a {
+  font-weight: bold;
+  border-bottom: 3px solid #007acc;
+}
+.agile-metrics-tabs a {
+  padding: 5px 10px;
+  display: inline-block;
+  text-decoration: none;
+  color: #007acc;
+}
+.metrics-tab-content {
+  padding-top: 10px;
+  padding: 1rem;
+}
+
+.filters-group {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+.metrics-group {
+}
+
+.metrics-group__title {
+  margin-bottom: 1rem;
+}
+
+.metrics-group__charts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+}
+
+.metrics-group__charts .chart {
+  width: 500px;
+  height: 600px;
+}
