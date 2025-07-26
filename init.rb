@@ -7,7 +7,7 @@ Redmine::Plugin.register :redmine_agile_metrics do
   author_url 'http://example.com/about'
 
   project_module :agile_metrics do
-    permission :view_agile_metrics, { agile_metrics: [:index, :get_velocity_chart_data,:get_issue_status_pie_data,:get_burndown_chart_data,:get_bug_count_by_status_chart_data,:bug_by_user_story_chart_data,:bugs_by_problem_category_chart_data,:get_blocked_issue_chart_data,:get_active_sprint_velocity_chart_data,:bug_production_not_closed_by_priority_chart_data] }, public: true
+    permission :view_agile_metrics, { agile_metrics: [:index, :get_velocity_chart_data,:get_issue_status_pie_data,:get_burndown_chart_data,:get_bug_count_by_status_chart_data,:bug_by_user_story_chart_data,:bugs_by_problem_category_chart_data,:get_blocked_issue_chart_data,:get_active_sprint_velocity_chart_data,:bug_production_not_closed_by_priority_chart_data] }, read: true
   end
 
   menu :project_menu,

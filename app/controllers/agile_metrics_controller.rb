@@ -1,7 +1,7 @@
 class AgileMetricsController < ApplicationController
   before_action :find_project
   before_action :current_version
-  before_action :authorize
+  # before_action :authorize
 
   def index
     # Status By Tracker Pie Chart
