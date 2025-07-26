@@ -86,7 +86,7 @@
   //////////////// PERFORMANCE /////////////////////////
   function fetchVelocityData() {
     // Lấy dữ liệu từ backend
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/active_sprint_velocity_chart`)
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/active_sprint_velocity_chart`)
       .then(data => {
         const ctx = document.getElementById('active-sprint-velocity-chart').getContext('2d');
 
@@ -172,7 +172,7 @@
   }
 
   function fetchBlockedIssuesData() {
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/blocked_issue_chart`)
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/blocked_issue_chart`)
       .then(data => {
         const ctx = document.getElementById('blocked-issue-chart').getContext('2d');
         new Chart(ctx, {
@@ -220,7 +220,7 @@
 
   async function renderIssueStatusDistributionChart() {
     // Pie Chart: Issue status distribution
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/issue_status_pie_chart`).then(data=>{
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/issue_status_pie_chart`).then(data=>{
       if (data.length > 0) {
         const statusLabels = data.map(i => i.name);
         const statusCounts = data.map(i => i.count);
@@ -282,7 +282,7 @@
     }
 
     const chartUnit = document.getElementById("chart_unit").value
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/burndown_chart?chart_unit=${chartUnit}`).then(data=>{
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/burndown_chart?chart_unit=${chartUnit}`).then(data=>{
       Chart.defaults.color = 'black';
       Chart.defaults.font.family = '"Arial", sans-serif';
       Chart.defaults.font.style = 'normal';
@@ -350,7 +350,7 @@
     
   ///////////////// QUANLITY ////////////////////////////
   function fetchBugStatusData() {
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/bug_count_by_status_chart`)
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/bug_count_by_status_chart`)
       .then(data => {
         const ctx = document.getElementById('bug-count-by-status-chart').getContext('2d');
             new Chart(ctx, {
@@ -393,7 +393,7 @@
 
   function fetchBugProductionByPriorityChartData() {
     // Lấy dữ liệu từ backend
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/bug_production_not_closed_by_priority_chart`)
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/bug_production_not_closed_by_priority_chart`)
       .then(data => {
         const ctx = document.getElementById('bug-production-by-priotity').getContext('2d');
         new Chart(ctx, {
@@ -475,7 +475,7 @@
   }
 
   function fetchBugByUserStoryData() {
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/bug_by_user_story_chart`)
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/bug_by_user_story_chart`)
       .then(data => {
         const ctx = document.getElementById('bug-count-by-user-story-chart').getContext('2d');
         new Chart(ctx, {
@@ -516,7 +516,7 @@
 
  
   function fetchBugByProblemCategoryData() {
-    $.getJSON(`/api/projects/${getProjectIdentifierFromUrl()}/bugs_by_problem_category_chart`)
+    $.getJSON(`/projects/${getProjectIdentifierFromUrl()}/metrics/bugs_by_problem_category_chart`)
       .then(data => {
         const ctx = document.getElementById('bug-by-problem-category-chart').getContext('2d');
         new Chart(ctx, {

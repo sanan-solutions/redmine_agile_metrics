@@ -59,7 +59,7 @@
   }
 
   async function renderVelocityChart() {
-    const data = await fetch(`/api/projects/${getProjectIdentifierFromUrl()}/velocity_chart`, {
+    const data = await fetch(`/projects/${getProjectIdentifierFromUrl()}/metrics/velocity_chart`, {
       method: 'GET',
       credentials: 'same-origin',
       headers: { 'Accept': 'application/json' }
