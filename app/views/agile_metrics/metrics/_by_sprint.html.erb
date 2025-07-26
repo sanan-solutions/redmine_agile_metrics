@@ -65,7 +65,6 @@
       headers: { 'Accept': 'application/json' }
     }).then(res => res.json())
 
-    console.log("data", data)
     const labels = data.map(d => d.version);
     const total = data.map(d => d.total);
     const completed = data.map(d => d.completed);
@@ -74,7 +73,6 @@
       return d.total > 0 ? (d.completed / d.total * 100).toFixed(2) : 0;
     });
 
-    console.log("CHART NE ENE")
     new Chart(document.getElementById('velocity-chart'), {
       type: 'bar',
       data: {
