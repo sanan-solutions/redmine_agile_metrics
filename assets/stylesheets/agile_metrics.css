@@ -31,6 +31,7 @@
 }
 
 .metrics-group {
+  margin-top: 4rem;
 }
 
 .metrics-group__title {
@@ -44,6 +45,18 @@
 }
 
 .metrics-group__charts .chart {
-  width: 500px;
-  height: 600px;
+  margin-bottom: 3rem;
+}
+
+.metrics-group__charts .chart canvas {
+  min-width: 600px;
+  max-width: 800px;
+  max-height: 450px;
+}
+
+.sprint-info {
+  margin-top: 2rem;
+  margin-bottom: -1rem;
+  
+  font-size: 0.9rem;
 }

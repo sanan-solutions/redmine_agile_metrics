@@ -19,11 +19,6 @@
       </div>
 
       <div class="chart">
-        <h3>Issue Status In Sprint "<%= @selected_version&.name || 'Không có' %>"</h3>
-        <canvas id="status-pie-chart" width="300" height="300"></canvas>
-      </div>
-
-      <div class="chart">
         <h3>Burndown</h3>
         <canvas id="burndown-chart" width="300" height="300"></canvas>
       </div>
@@ -36,7 +31,7 @@
     <div class="metrics-group__charts">
       <div class="chart">
         <h3>Bug Rate By Sprint (Total bugs/Total Story point completed)</h3>
-        <canvas id="velocity-chart" width="600" height="400"></canvas>
+        <canvas id="bug-rate-by-sprint" width="600" height="400"></canvas>
       </div>
 
       <div class="chart">
@@ -58,8 +53,17 @@
 </div>
 
 <script>
-  function renderVelocityChart() {
-    const data = <%= raw @velocity_data.to_json %>;
+  function getProjectIdentifierFromUrl() {
+    const match = window.location.pathname.match(/^\/projects\/([^\/]+)/);
+    return match ? match[1] : null;
+  }
+
+  async function renderVelocityChart() {
+    const data = await fetch(`/api/projects/${getProjectIdentifierFromUrl()}/velocity_chart`, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    }).then(res => res.json())
 
     console.log("data", data)
     const labels = data.map(d => d.version);
@@ -70,6 +74,7 @@
       return d.total > 0 ? (d.completed / d.total * 100).toFixed(2) : 0;
     });
 
+    console.log("CHART NE ENE")
     new Chart(document.getElementById('velocity-chart'), {
       type: 'bar',
       data: {
@@ -134,38 +139,9 @@
     });
   }
   
-  function renderIssueStatusDistributionChart() {
-    // Pie Chart: Issue status distribution
-    const issueStatusData = <%= raw @issue_status_data.to_json %>;
-    if (issueStatusData.length > 0) {
-      const statusLabels = issueStatusData.map(i => i.name);
-      const statusCounts = issueStatusData.map(i => i.count);
-      const pieColors = ['#4caf50', '#f44336', '#2196f3', '#ff9800', '#9c27b0', '#607d8b'];
 
-      console.log("he", statusLabels, statusCounts)
-      new Chart(document.getElementById('status-pie-chart'), {
-        type: 'pie',
-        data: {
-          labels: statusLabels,
-          datasets: [{
-            data: statusCounts,
-            backgroundColor: pieColors
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            title: {
-              display: true,
-              text: 'Issue Status Distribution'
-            }
-          }
-        }
-      });
-    }
-  }
-
+document.addEventListener('DOMContentLoaded', function () {
   renderVelocityChart()
-  renderIssueStatusDistributionChart()
+});
 
 </script>

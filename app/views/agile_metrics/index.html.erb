@@ -8,9 +8,14 @@
 
 <div class="agile-metrics-tabs">
   <ul>
-    <li class="selected"><a href="#tab-by-sprints">Metrics By Sprints</a></li>
+   <li class="selected"><a href="#active-sprint">Active Sprint</a></li>
+    <li><a href="#tab-by-sprints">Metrics By Sprints</a></li>
     <li><a href="#tab-by-filter">Metrics By Filter</a></li>
   </ul>
+</div>
+
+<div class="metrics-tab-content" id="active-sprint" style="display:none;">
+  <%= render partial: 'agile_metrics/metrics/active_sprint' %>
 </div>
 
 <div class="metrics-tab-content" id="tab-by-sprints" style="display:none;">
@@ -43,5 +48,11 @@
         document.querySelector(targetId).style.display = "block";
       });
     });
+
+    const initTab = tabs[0]
+    initTab.parentElement.classList.add("selected");
+    const targetId = initTab.getAttribute("href");
+    document.querySelector(targetId).style.display = "block";
+
   });
 </script>

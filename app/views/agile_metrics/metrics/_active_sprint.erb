@@ -1,0 +1,597 @@
+<div class="metrics-by-sprint">
+  <h1>Metrics for Active Sprint</h1>
+
+  <div class="sprint-info">
+    <h2>Thông tin Sprint: </h2>
+    <div>
+      <b>Tên Sprint: </b><%= @current_version&.name %>
+    </div>
+    <div>
+      <b>Description: </b><%= @current_version&.description %>
+    </div>
+    <div>
+      <b>Thời gian bắt đầu: </b><%= @current_version&.start_date %>
+    </div>
+    <div>
+      <b>Thời gian kết thúc: </b><%= @current_version&.due_date %>
+    </div>
+  </div>
+
+  <div class="metrics-group">
+    <h2 class="metrics-group__title">Performance</h2>
+    <div class="metrics-group__charts">
+      <div class="chart">
+        <h3>Velocity</h3>
+        <canvas id="active-sprint-velocity-chart" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Blocked Issue</h3>
+        <canvas id="blocked-issue-chart" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Issue Status</h3>
+        <canvas id="status-pie-chart" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Burndown</h3>
+        <div>
+              <span id="chart-unit-row">
+        <label for='chart_unit'><%= l(:label_agile_chart_units) %></label>
+        <%= select_tag 'chart_unit', options_chart_units_for_select,
+                       onchange: "renderBurndownChart();" %>
+      </span>
+        </div>
+        <canvas id="burndown-chart" width="300p" height="300"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-group">
+    <h2 class="metrics-group__title">Quanlity</h2>
+
+    <div class="metrics-group__charts">
+      <div class="chart">
+        <h3>Bugs by Status</h3>
+        <canvas id="bug-count-by-status-chart" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Bugs Production not close by Priority</h3>
+        <canvas id="bug-production-by-priotity" width="300" height="300"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Bugs by User Story</h3>
+        <canvas id="bug-count-by-user-story-chart" width="600" height="400"></canvas>
+      </div>
+
+      <div class="chart">
+        <h3>Bugs by Problem Category</h3>
+        <canvas id="bug-by-problem-category-chart" width="300" height="300"></canvas>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  function getProjectIdentifierFromUrl() {
+    const match = window.location.pathname.match(/^\/projects\/([^\/]+)/);
+    return match ? match[1] : null;
+  }
+  
+  async function renderIssueStatusDistributionChart() {
+    // Pie Chart: Issue status distribution
+    const issueStatusData = await fetch(`/api/projects/${getProjectIdentifierFromUrl()}/issue_status_pie_chart`, {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    }).then(res => res.json())
+
+    if (issueStatusData.length > 0) {
+      const statusLabels = issueStatusData.map(i => i.name);
+      const statusCounts = issueStatusData.map(i => i.count);
+      const pieColors = ['#4caf50', '#f44336', '#2196f3', '#ff9800', '#9c27b0', '#607d8b'];
+
+      console.log("he", statusLabels, statusCounts)
+      new Chart(document.getElementById('status-pie-chart'), {
+        type: 'pie',
+        data: {
+          labels: statusLabels,
+          datasets: [{
+            data: statusCounts,
+            backgroundColor: pieColors
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Issue Status Distribution'
+            }
+          }
+        }
+      });
+    }
+  }
+
+  let burndownChartInstance = null;
+  async function renderBurndownChart() {
+    const chartTooltipCallbacks = (chartType) =>{
+      if (chartType === 'scatter') {
+        return scatterChartTooltipCallbacks()
+      } else {
+        return {}
+      }
+    };
+
+    const  scatterChartTooltipCallbacks = ()=> {
+      return {
+        title: function (tooltipItem, data) {
+          return data.labels[tooltipItem[0].xLabel] || '';
+        },
+        label: function (tooltipItem, data) {
+          var label = data.datasets[tooltipItem.datasetIndex].label || '';
+          if (label) { label += ': ' }
+          label += tooltipItem.yLabel;
+          return label;
+        }
+      }
+    };
+
+    const chartEl = document.getElementById("burndown-chart");
+
+    if (!chartEl) return;
+
+    if (burndownChartInstance) {
+      burndownChartInstance.destroy();
+    }
+
+    const chartUnit = document.getElementById("chart_unit").value
+    fetch(`/api/projects/${getProjectIdentifierFromUrl()}/burndown_chart?chart_unit=${chartUnit}`, {
+      credentials: 'same-origin'
+    })
+      .then(response => response.json())
+      .then(data => {
+        Chart.defaults.color = 'black';
+        Chart.defaults.font.family = '"Arial", sans-serif';
+        Chart.defaults.font.style = 'normal';
+
+        const chartData = {
+          labels: data.labels,
+          datasets: data.datasets,
+          stacked: data.stacked
+        };
+
+        burndownChartInstance = new Chart(chartEl.getContext("2d"), {
+          type: data.type || 'bar',
+          data: chartData,
+          options: {
+            maintainAspectRatio: false,
+            elements: {
+              line: { tension: 0 }
+            },
+            tooltips: {
+              onlyShowForDatasetIndex: data.show_tooltips,
+              callbacks: chartTooltipCallbacks(data.type)
+            },
+            legend: {
+              position: 'right',
+              labels: {
+                filter: function (legendItem, chartData) {
+                  return !!legendItem.text;
+                }
+              }
+            },
+            title: {
+              display: true,
+              fontSize: 16,
+              fontStyle: 'normal',
+              text: data.title
+            },
+            scales: {
+              y: {
+                stacked: data.stacked,
+                title: {
+                  display: true,
+                  fontColor: 'rgba(255, 0, 0 ,1)',
+                  fontSize: 14,
+                  text: data.y_title
+                }
+              },
+              x: {
+                ticks: {
+                  autoSkip: true,
+                  maxRotation: 0,
+                  callback: function (value, index, values) {
+                    if (data.type === 'scatter') {
+                      return data.labels[value];
+                    } else {
+                      return value;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Chart load failed:', error);
+      });
+  }
+
+  function fetchBlockedIssuesData() {
+    fetch(`/api/projects/${getProjectIdentifierFromUrl()}/blocked_issue_chart`)
+      .then(response => response.json())
+      .then(data => {
+        const ctx = document.getElementById('blocked-issue-chart').getContext('2d');
+        new Chart(ctx, {
+          type: 'line',  // Chọn loại biểu đồ line
+          data: {
+            labels: data.labels,  // Các ngày
+            datasets: [{
+              label: 'Blocked Issues',
+              data: data.data,  // Số lượng issues mỗi ngày
+              borderColor: 'rgba(255, 99, 132, 1)',  // Màu đường của line chart
+              backgroundColor: 'rgba(255, 99, 132, 0.2)',  // Màu nền
+              fill: true  // Tô màu dưới đường vẽ
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: 'Date'
+                }
+              },
+              y: {
+                  beginAtZero: true,    // Đảm bảo trục Y bắt đầu từ 0
+                  ticks: {
+                    stepSize: 1,      // Đảm bảo các giá trị trên trục Y là số nguyên (int)
+                    precision: 0,     // Đảm bảo không có số thập phân
+                    callback: function(value) {
+                      return value % 1 === 0 ? value : '';  // Hiển thị số nguyên (int) trên trục Y
+                    }
+                  }
+                }
+            },
+            plugins: {
+              legend: {
+                display: false  // Ẩn legend (label)
+              }
+            }
+          }
+        });
+      })
+      .catch(error => console.error('Error fetching blocked issues data:', error));
+    }
+
+
+    function fetchBugStatusData() {
+      fetch(`/api/projects/${getProjectIdentifierFromUrl()}/bug_count_by_status_chart`)
+        .then(response => response.json())
+        .then(data => {
+          const ctx = document.getElementById('bug-count-by-status-chart').getContext('2d');
+              new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: data.labels,  // Các status
+            datasets: data.datasets  // Các loại bug (UAT, Production, Development)
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                stacked: true
+              },
+              y: {
+                stacked: true,
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: 'Number of Bugs'
+                },
+                ticks: {
+                  stepSize: 1,      // Đảm bảo các giá trị trên trục Y là số nguyên (int)
+                  precision: 0,     // Đảm bảo không có số thập phân
+                  callback: function(value) {
+                    return value % 1 === 0 ? value : '';  // Hiển thị số nguyên (int) trên trục Y
+                  }
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                position: 'top',
+              },
+            },
+          }
+        });
+        })
+        .catch(error => console.error('Error fetching bug status data:', error));
+    }
+
+    const  getColorForStage = (stage) => {
+      switch (stage) {
+        case 'UT':
+          return 'rgba(75, 192, 192, 0.6)';
+        case 'IT':
+          return 'rgba(153, 102, 255, 0.6)';
+        case 'ST':
+          return 'rgba(255, 159, 64, 0.6)';
+        case 'UAT':
+          return 'rgba(54, 162, 235, 0.6)';
+        case 'Production':
+          return 'rgba(255, 99, 132, 0.6)';
+        case 'Development':
+          return 'rgba(75, 192, 192, 0.6)';
+        default:
+          return 'rgba(200, 200, 200, 0.6)';
+      }
+    }
+
+    function fetchBugByUserStoryData() {
+      const projectId = '<%= @project.id %>';  // Lấy ID project từ server
+      const versionId = '<%= @current_version.id %>';  // Lấy ID của version hiện tại từ server
+
+      fetch(`/api/projects/${getProjectIdentifierFromUrl()}/bug_by_user_story_chart`)
+        .then(response => response.json())
+        .then(data => {
+          const ctx = document.getElementById('bug-count-by-user-story-chart').getContext('2d');
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: data.labels,  // Các user stories
+              datasets: data.datasets.map(dataset => ({
+                label: dataset.label,
+                data: dataset.data,
+                backgroundColor: getColorForStage(dataset.label),  // Chọn màu cho từng Discovery Stage
+                borderColor: 'rgba(0,0,0,0.1)',  // Màu viền của các cột
+                borderWidth: 1
+              }))
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: {
+                  stacked: true  // Chồng các cột lên nhau
+                },
+              y: {
+                  stacked: true,
+                  beginAtZero: true,    // Đảm bảo trục Y bắt đầu từ 0
+                  ticks: {
+                    stepSize: 1,      // Đảm bảo các giá trị trên trục Y là số nguyên (int)
+                    precision: 0,     // Đảm bảo không có số thập phân
+                    callback: function(value) {
+                      return value % 1 === 0 ? value : '';  // Hiển thị số nguyên (int) trên trục Y
+                    }
+                  }
+                }
+              }
+            }
+          });
+      })
+      .catch(error => console.error('Error fetching bug data:', error));
+    }
+
+    function fetchBugByProblemCategoryData() {
+      fetch(`/api/projects/${getProjectIdentifierFromUrl()}/bugs_by_problem_category_chart`)
+        .then(response => response.json())
+        .then(data => {
+          const ctx = document.getElementById('bug-by-problem-category-chart').getContext('2d');
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: data.labels,  // Các giá trị Problem Category
+              datasets: data.datasets.map(dataset => ({
+                label: dataset.label,
+                data: dataset.data,
+                backgroundColor: getColorForStage(dataset.label),  // Chọn màu cho từng Discovery Stage
+                borderColor: 'rgba(0,0,0,0.1)',  // Màu viền của các cột
+                borderWidth: 1
+              }))
+            },
+            options: {
+                responsive: true,
+                scales: {
+                  x: {
+                    stacked: true  // Chồng các cột lên nhau
+                  },
+                  y: {
+                      stacked: true ,
+                    beginAtZero: true,    // Đảm bảo trục Y bắt đầu từ 0
+                    ticks: {
+                      stepSize: 1,      // Đảm bảo các giá trị trên trục Y là số nguyên (int)
+                      precision: 0,     // Đảm bảo không có số thập phân
+                      callback: function(value) {
+                        return value % 1 === 0 ? value : '';  // Hiển thị số nguyên (int) trên trục Y
+                      }
+                    }
+                  }
+                },
+                plugins: {
+                  legend: {
+                    display: false  // Ẩn legend (chú thích) nếu không muốn hiển thị nhãn dataset
+                  }
+                }
+              }
+          });
+        })
+        .catch(error => console.error('Error fetching bug by problem category data:', error));
+    }
+
+    function fetchVelocityData() {
+    const projectId = '<%= @project.id %>';  // Lấy ID của project từ server (hoặc thay thế bằng ID của project)
+
+    // Lấy dữ liệu từ backend
+    fetch(`/api/projects/${getProjectIdentifierFromUrl()}/active_sprint_velocity_chart`)
+      .then(response => response.json())
+      .then(data => {
+        const ctx = document.getElementById('active-sprint-velocity-chart').getContext('2d');
+
+        // Tạo biểu đồ cột (bar chart) với dữ liệu trả về từ backend
+        new Chart(ctx, {
+          type: 'bar',  // Chọn loại biểu đồ cột
+          data: {
+            labels: ['SP Development Team', 'SP Backend', 'SP Frontend', 'SP Tester'],  // Các nhãn cho trục X
+            datasets: [
+              {
+              label: 'Commited Story Points',  // Dữ liệu cho biểu đồ
+              data: [
+                data.sp_commit, 
+                data.sp_backend_commit, 
+                data.sp_frontend_commit, 
+                data.sp_tester_commit
+              ],
+              backgroundColor: [
+                'rgba(54, 162, 235, 0.2)',  // Màu cho cột SP Commit
+                'rgba(255, 99, 132, 0.2)',  // Màu cho cột SP Backend Commit
+                'rgba(75, 192, 192, 0.2)',  // Màu cho cột SP Frontend Commit
+                'rgba(153, 102, 255, 0.2)'  // Màu cho cột SP Tester Commit
+              ],
+              borderColor: [
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 99, 132, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)'
+              ],
+              borderWidth: 1
+            }, {
+              label: 'Completed Story Points',  // Dữ liệu cho hoàn thành SP
+              data: [
+                data.sp_done, 
+                data.sp_backend_done, 
+                data.sp_frontend_done, 
+                data.sp_tester_done
+              ],
+              backgroundColor: [
+              'rgba(54, 162, 235, 0.7)',  // Màu cho cột SP Commit
+                'rgba(255, 99, 132, 0.7)',  // Màu cho cột SP Backend Commit
+                'rgba(75, 192, 192, 0.7)',  // Màu cho cột SP Frontend Commit
+                'rgba(153, 102, 255, 0.7)'  // Màu cho cột SP Tester Commit
+              ],
+              borderColor: [
+              'rgba(54, 162, 235, 1)',  // Màu cho cột SP Commit
+                'rgba(255, 99, 132, 1)',  // Màu cho cột SP Backend Commit
+                'rgba(75, 192, 192, 1)',  // Màu cho cột SP Frontend Commit
+                'rgba(153, 102, 255, 1)' 
+              ],
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                title: {
+                  display: false,
+                  text: 'Categories'  // Tiêu đề cho trục X
+                }
+              },
+              y: {
+                title: {
+                  display: true,
+                  text: 'Story Points'  // Tiêu đề cho trục Y
+                },
+                beginAtZero: true  // Đảm bảo trục Y bắt đầu từ 0
+              }
+            },
+            plugins: {
+              legend: {
+                position: 'top',
+              },
+              tooltip: {
+                enabled: true  // Hiển thị tooltip khi hover vào các cột
+              }
+            }
+          }
+        });
+      })
+      .catch(error => console.error('Error fetching velocity chart data:', error));
+  }
+
+  function fetchBugProductionByPriorityChartData() {
+  // Lấy dữ liệu từ backend
+  fetch(`/api/projects/${getProjectIdentifierFromUrl()}/bug_production_not_closed_by_priority_chart`)
+    .then(response => response.json())
+    .then(data => {
+      const ctx = document.getElementById('bug-production-by-priotity').getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',  // Loại biểu đồ cột
+        data: {
+          labels: data.labels,  // Các priority
+          datasets: [{
+            label: 'Number of Production Bugs Not Closed',
+            data: data.counts,  // Số lượng bug trong từng priority
+            backgroundColor: [
+              'rgba(75, 192, 192, 0.2)',
+              'rgba(169, 169, 169, 0.2)',
+              'rgba(255, 159, 64, 0.2)',
+              'rgba(255, 99, 132, 0.2)',
+              'rgba(255, 0, 0, 0.2)'
+            ],  // Màu cho cột
+            borderColor: [
+              'rgba(75, 192, 192, 1)',
+              'rgba(169, 169, 169, 1)',
+              'rgba(255, 159, 64, 1)',
+              'rgba(255, 99, 132, 1)',
+              'rgba(255, 0, 0, 1)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: 'Number of Bugs'
+              },
+              ticks: {
+                  stepSize: 1,      // Đảm bảo các giá trị trên trục Y là số nguyên (int)
+                  precision: 0,     // Đảm bảo không có số thập phân
+                  callback: function(value) {
+                    return value % 1 === 0 ? value : '';  // Hiển thị số nguyên (int) trên trục Y
+                  }
+              }
+            },
+            x: {
+              title: {
+                display: true,
+                text: 'Priority'
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false  // Ẩn legend (label)
+            }
+          }
+        }
+      });
+    })
+    .catch(error => console.error('Error fetching bug chart data:', error));
+}
+
+
+  document.addEventListener('DOMContentLoaded', function () {
+    renderIssueStatusDistributionChart()
+    renderBurndownChart()
+    fetchBugStatusData()
+    fetchBugByUserStoryData()
+    fetchBugByProblemCategoryData()
+    fetchVelocityData()
+    fetchBlockedIssuesData()
+    fetchBugProductionByPriorityChartData()
+  });
+
+</script>
