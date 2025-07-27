@@ -225,12 +225,12 @@ class AgileMetricsController < ApplicationController
       # Thêm "Other" vào danh sách Discovery Stage nếu có bugs không có giá trị Discovery Stage
       category_counts << { stage: 'Discovery Stage not selected', count: other_bug_count }
 
-      { user_story_name: user_story.subject, category_counts: category_counts }
+      { user_story_name: user_story.subject, user_story_id: user_story.id, category_counts: category_counts }
     end
 
     # Trả về dữ liệu cho frontend dưới dạng JSON
     render json: {
-      labels: @bug_counts.map { |data| data[:user_story_name] },  # Các user stories
+      labels: @bug_counts.map { |data| {id: data[:user_story_id] ,title: data[:user_story_name]} },  # Các user stories
       datasets: discovery_stages.map do |stage|
         {
           label: stage,

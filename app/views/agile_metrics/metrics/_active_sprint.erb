@@ -481,7 +481,7 @@
         new Chart(ctx, {
           type: 'bar',
           data: {
-            labels: data.labels,  // Các user stories
+            labels: data.labels.map(i => `Story#${i.id}`),  // Các user stories
             datasets: data.datasets.map(dataset => ({
               label: dataset.label,
               data: dataset.data,
@@ -494,9 +494,9 @@
             responsive: true,
             scales: {
               x: {
-                stacked: true  // Chồng các cột lên nhau
+                stacked: true,  // Chồng các cột lên nhau
               },
-            y: {
+              y: {
                 stacked: true,
                 beginAtZero: true,    // Đảm bảo trục Y bắt đầu từ 0
                 ticks: {
@@ -504,6 +504,16 @@
                   precision: 0,     // Đảm bảo không có số thập phân
                   callback: function(value) {
                     return value % 1 === 0 ? value : '';  // Hiển thị số nguyên (int) trên trục Y
+                  }
+                }
+              }
+            },
+            plugins: {
+              tooltip: {
+                callbacks: {
+                  title: function (tooltipItems) {
+                    const index = tooltipItems[0].dataIndex;
+                    return data.labels[index].title;
                   }
                 }
               }
