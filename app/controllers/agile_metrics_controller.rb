@@ -200,7 +200,7 @@ class AgileMetricsController < ApplicationController
     @bugs = @project.issues.where(tracker: Tracker.find_by(name: 'Bug'), fixed_version: @current_version)
 
     # Group bugs theo user story (parent issue)
-    @user_stories = @project.issues.where(parent_id: nil)  # Lấy tất cả user stories (issues cha)
+    @user_stories = @project.issues.where(parent_id: nil, fixed_version: @current_version)  # Lấy tất cả user stories (issues cha)
 
     # Lấy các giá trị của "Discovery Stage" (UT, IT, ST, UAT)
     discovery_stages = discovery_stage_field.possible_values
