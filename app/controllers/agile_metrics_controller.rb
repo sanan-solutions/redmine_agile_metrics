@@ -1,9 +1,11 @@
 class AgileMetricsController < ApplicationController
   before_action :find_project
   before_action :current_version
-  # before_action :authorize
+  skip_before_action :check_if_login_required
+  # before_action :authorize  
 
   def index
+    Rails.logger.info ">>> User1: #{User.current.login}"
     # Status By Tracker Pie Chart
     # Danh sách sprint của project (mặc định sắp theo ngày)
     @versions = Version.where(project_id: @project.id)
@@ -41,6 +43,10 @@ class AgileMetricsController < ApplicationController
   end
 
   def get_velocity_chart_data
+    Rails.logger.info "Cookies = #{cookies.to_hash.inspect}"
+    Rails.logger.info ">>> Session keys: #{session.to_hash.keys}"
+    Rails.logger.info ">>> Current user: #{User.current.inspect}"
+    Rails.logger.info ">>> User: #{User.current.login}"
     # Velocity Chart
     @versions = @project.shared_versions.sorted
     velocity_data = @versions.map do |version|

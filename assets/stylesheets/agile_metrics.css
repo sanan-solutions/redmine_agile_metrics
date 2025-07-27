@@ -1,5 +1,6 @@
 .agile-metrics-tabs {
   margin-bottom: 10px;
+  margin-top: 1.5rem;
 }
 .agile-metrics-tabs ul {
   list-style: none;
@@ -57,6 +58,6 @@
 .sprint-info {
   margin-top: 2rem;
   margin-bottom: -1rem;
-  
+
   font-size: 0.9rem;
 }
