@@ -67,233 +67,7 @@ class AgileMetricsController < ApplicationController
     render json: velocity_data
   end
 
-  def get_issue_status_pie_data
-    # Pie chart: Issue status by selected version
-    issue_status_data = if @current_version
-      Issue.where(project_id: @project.id, fixed_version_id: @current_version.id)
-           .group(:status_id)
-           .count
-           .map do |status_id, count|
-              {
-                name: IssueStatus.find_by(id: status_id)&.name || "Unknown",
-                count: count
-              }
-           end
-    else
-      []
-    end
-
-    render json: issue_status_data
-  end
-
-  def get_burndown_chart_data
-    @issues = @current_version.fixed_issues
-    options = { 
-      date_from: @current_version.start_date,
-      date_to: @current_version.due_date,
-      due_date: @current_version.due_date,
-      chart_unit: params[:chart_unit] 
-    }
-    @chart = "burndown_chart"
-
-    agile_chart = RedmineAgile::Charts::Helper::AGILE_CHARTS[@chart]
-    data = agile_chart[:class].data(@issues, options) if agile_chart
-
-    if data
-      data[:chart] = @chart
-      data[:chart_unit] = options[:chart_unit]
-      return render json: data
-    end
-
-    raise ActiveRecord::RecordNotFound
-  end
-
-  #### Quanlity #####
-  def get_bug_count_by_status_chart_data
-    # Lấy custom field "Discovery Stage"
-    discovery_stage_field = CustomField.find_by(name: 'Discovery Stage')
-
-    # Kiểm tra nếu custom field "Discovery Stage" không tồn tại
-    if discovery_stage_field.nil?
-      render json: { error: 'Custom Field "Discovery Stage" not found' }, status: :not_found
-      return
-    end
-
-    # Lấy tất cả các issue có tracker là "Bug" trong project và version hiện tại
-    bugs = @project.issues.where(tracker: Tracker.find_by(name: 'Bug'), fixed_version: @current_version)
-
-    # Phân nhóm theo status và đếm số lượng bug theo từng trạng thái
-    development_uat_bug_count = bugs.group(:status_id).count
-
-    uat_bug_count = bugs
-                        .joins(:custom_values)
-                        .where(custom_values: { custom_field_id: discovery_stage_field.id, value: "UAT" })
-                        .group(:status_id)
-                        .count
-
-    production_bug_count = @project.issues.where(tracker: Tracker.find_by(name: 'Bug - Production'), fixed_version: @current_version).group(:status_id).count
-
-    # Tính toán số lượng development bugs (bug_status_counts - uat_bug_count)
-    development_bug_count = development_uat_bug_count.dup
-    uat_bug_count.each do |status_id, count|
-      # Trừ đi số lượng UAT bugs từ bug_status_counts để có số lượng development bugs
-      development_bug_count[status_id] -= count
-    end
-
-    # Tạo dữ liệu cho biểu đồ cột chồng
-    all_status_ids = (development_uat_bug_count.keys + production_bug_count.keys).uniq
-    status_labels = IssueStatus.where(id: all_status_ids).pluck(:name)
-    uat_counts = []
-    production_counts = []
-    development_counts = []
-
-    # Chuẩn bị dữ liệu cho từng loại bug theo từng status
-    status_labels.each do |status|
-      status_id = IssueStatus.find_by(name: status).id
-
-      # Lấy số lượng của từng loại bug, mặc định là 0 nếu không có dữ liệu
-      uat_counts << (uat_bug_count[status_id] || 0)
-      production_counts << (production_bug_count[status_id] || 0)
-      development_counts << (development_bug_count[status_id] || 0)
-    end
-
-    # Trả về dữ liệu cho frontend dưới dạng JSON
-    render json: {
-      labels: status_labels,
-      datasets: [
-        {
-          label: 'Development Bugs',
-          data: development_counts,
-          backgroundColor: 'rgba(75, 192, 192, 0.2)',  # Màu cho development bugs
-          borderColor: 'rgba(75, 192, 192, 1)',
-          borderWidth: 1
-        },
-        {
-          label: 'UAT Bugs',
-          data: uat_counts,
-          backgroundColor: 'rgba(54, 162, 235, 0.2)',  # Màu cho production bugs
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1
-        },
-        {
-          label: 'Production Bugs',
-          data: production_counts,
-          backgroundColor: 'rgba(255, 99, 132, 0.2)',  # Màu cho UAT bugs
-          borderColor: 'rgba(255, 99, 132, 1)',
-          borderWidth: 1
-        },
-      ]
-    }
-  end
-
-  def bug_by_user_story_chart_data
-    # Lấy custom field "Discovery Stage"
-    discovery_stage_field = CustomField.find_by(name: 'Discovery Stage')
-
-    # Kiểm tra nếu custom field "Discovery Stage" không tồn tại
-    if discovery_stage_field.nil?
-      render json: { error: 'Custom Field "Discovery Stage" not found' }, status: :not_found
-      return
-    end
-
-    # Lấy tất cả các issue có tracker là "Bug" và liên kết với các User Stories (issues parent)
-    @bugs = @project.issues.where(tracker: Tracker.find_by(name: 'Bug'), fixed_version: @current_version)
-
-    # Group bugs theo user story (parent issue)
-    @user_stories = @project.issues.where(tracker: Tracker.find_by(name: 'Story'), fixed_version: @current_version)  # Lấy tất cả user stories (issues cha)
-
-    # Lấy các giá trị của "Discovery Stage" (UT, IT, ST, UAT)
-    discovery_stages = discovery_stage_field.possible_values
-    
-    # Lưu trữ dữ liệu số lượng bugs cho từng user story và discovery stage
-    @bug_counts = @user_stories.map do |user_story|
-      # Group bugs của mỗi user story theo Discovery Stage
-      category_counts = discovery_stages.map do |stage|
-        bug_count = @bugs.where(parent_id: user_story.id)
-                        .joins(:custom_values)
-                        .where(custom_values: { custom_field_id: discovery_stage_field.id, value: stage })
-                        .count
-        { stage: stage, count: bug_count }
-      end
-
-      # Đếm bugs mà không có Discovery Stage (null hoặc không có giá trị)
-      other_bug_count = @bugs.where(parent_id: user_story.id)
-                .joins("LEFT JOIN custom_values ON custom_values.customized_id = issues.id AND custom_values.customized_type = 'Issue' AND custom_values.custom_field_id = #{discovery_stage_field.id}")
-                .where("custom_values.value IS NULL OR custom_values.id IS NULL")
-                .count
-
-      # Thêm "Other" vào danh sách Discovery Stage nếu có bugs không có giá trị Discovery Stage
-      category_counts << { stage: 'Discovery Stage not selected', count: other_bug_count }
-
-      { user_story_name: user_story.subject, user_story_id: user_story.id, category_counts: category_counts }
-    end
-
-    # Trả về dữ liệu cho frontend dưới dạng JSON
-    render json: {
-      labels: @bug_counts.map { |data| {id: data[:user_story_id] ,title: data[:user_story_name]} },  # Các user stories
-      datasets: discovery_stages.map do |stage|
-        {
-          label: stage,
-          data: @bug_counts.map { |data| data[:category_counts].find { |c| c[:stage] == stage }[:count] }
-        }
-      end.concat([{  # Thêm dữ liệu cho "Other"
-        label: 'Discovery Stage not selected',
-        data: @bug_counts.map { |data| data[:category_counts].find { |c| c[:stage] == 'Discovery Stage not selected' }[:count] }
-      }])
-    }
-  end
-
-  def bugs_by_problem_category_chart_data
-    # Lấy tất cả các issue có tracker là "Bug" trong project và version hiện tại
-    @bugs = @project.issues.where(tracker: Tracker.find_by(name: 'Bug'), fixed_version: @current_version)
-
-    # Lấy danh sách các giá trị của custom field "Problem Category"
-    problem_category_field = CustomField.find_by(name: 'Problem Category')
-    if problem_category_field.nil?
-      render json: { error: 'Custom Field "Problem Category" not found' }, status: :not_found
-      return
-    end
-
-    discovery_stage_field = CustomField.find_by(name: 'Discovery Stage')
-    # Kiểm tra nếu custom field "Discovery Stage" không tồn tại
-    if discovery_stage_field.nil?
-      render json: { error: 'Custom Field "Discovery Stage" not found' }, status: :not_found
-      return
-    end
-
-    problem_categories = problem_category_field.enumerations.pluck(:id, :name)
-
-    # Đếm số lượng bugs theo từng giá trị của Problem Category
-    @category_counts = problem_categories.map do |category|
-      bug_count = @bugs.joins(:custom_values).where(custom_values: { custom_field_id: problem_category_field.id, value: category[0] }).count
-
-      uat_bug_count = @bugs
-      .joins(:custom_values)  # Inner Join với custom_values
-      .where("custom_values.custom_field_id = ? AND custom_values.value = 'UAT'", discovery_stage_field.id)
-      .or(@project.issues.joins(:custom_values)
-                        .where("custom_values.custom_field_id = ? AND custom_values.value = ?", problem_category_field.id, category[0]))
-      .group("issues.id")  # Nhóm theo bug.id
-      .having("COUNT(issues.id) = 2")  # Lọc bugs có COUNT = 
-
-      { category_name: category[1], dev_bug_count: bug_count - uat_bug_count.length, uat_bug_count: uat_bug_count.length }
-    end
-
-    # Trả về dữ liệu cho frontend
-    render json: {
-      labels: @category_counts.map { |data| data[:category_name] },
-      datasets: [
-        {
-          label: "Development",
-          data: @category_counts.map { |data| data[:dev_bug_count] }
-        },
-        {
-          label: "UAT",
-          data: @category_counts.map { |data| data[:uat_bug_count] }
-        }
-      ]
-    }
-  end
-
+  ############ PERFORMANCE ###########################
   def calculate_story_points_for_custom_field(custom_field_name, trackers, statuses)
     custom_field = CustomField.find_by(name: custom_field_name)
     # Kiểm tra nếu custom field không tồn tại
@@ -427,6 +201,132 @@ class AgileMetricsController < ApplicationController
     }
   end
 
+  def get_issue_status_pie_data
+    # Pie chart: Issue status by selected version
+    issue_status_counts = Issue
+      .where(project_id: @project.id, fixed_version_id: @current_version.id)
+      .group(:status_id)
+      .count
+
+    # Bước 2: Load tất cả status liên quan, chỉ 1 query
+    statuses = IssueStatus
+      .where(id: issue_status_counts.keys)
+      .index_by(&:id)  # => { id => IssueStatus }
+
+    # Bước 3: Sắp xếp theo position và build JSON
+    issue_status_data = issue_status_counts
+      .sort_by { |status_id, _| statuses[status_id]&.position || Float::INFINITY }
+      .map do |status_id, count|
+        status = statuses[status_id]
+        {
+          name: status&.name || "Unknown",
+          count: count
+        }
+      end
+
+    render json: issue_status_data
+  end
+
+  def get_burndown_chart_data
+    @issues = @current_version.fixed_issues
+    options = { 
+      date_from: @current_version.start_date,
+      date_to: @current_version.due_date,
+      due_date: @current_version.due_date,
+      chart_unit: params[:chart_unit] 
+    }
+    @chart = "burndown_chart"
+
+    agile_chart = RedmineAgile::Charts::Helper::AGILE_CHARTS[@chart]
+    data = agile_chart[:class].data(@issues, options) if agile_chart
+
+    if data
+      data[:chart] = @chart
+      data[:chart_unit] = options[:chart_unit]
+      return render json: data
+    end
+
+    raise ActiveRecord::RecordNotFound
+  end
+
+  ############## Quanlity #########################
+  def get_bug_count_by_status_chart_data
+    # Lấy custom field "Discovery Stage"
+    discovery_stage_field = CustomField.find_by(name: 'Discovery Stage')
+
+    # Kiểm tra nếu custom field "Discovery Stage" không tồn tại
+    if discovery_stage_field.nil?
+      render json: { error: 'Custom Field "Discovery Stage" not found' }, status: :not_found
+      return
+    end
+
+    # Lấy tất cả các issue có tracker là "Bug" trong project và version hiện tại
+    bugs = @project.issues.where(tracker: Tracker.find_by(name: 'Bug'), fixed_version: @current_version)
+
+    # Phân nhóm theo status và đếm số lượng bug theo từng trạng thái
+    development_uat_bug_count = bugs.group(:status_id).count
+
+    uat_bug_count = bugs
+                        .joins(:custom_values)
+                        .where(custom_values: { custom_field_id: discovery_stage_field.id, value: "UAT" })
+                        .group(:status_id)
+                        .count
+
+    production_bug_count = @project.issues.where(tracker: Tracker.find_by(name: 'Bug - Production'), fixed_version: @current_version).group(:status_id).count
+
+    # Tính toán số lượng development bugs (bug_status_counts - uat_bug_count)
+    development_bug_count = development_uat_bug_count.dup
+    uat_bug_count.each do |status_id, count|
+      # Trừ đi số lượng UAT bugs từ bug_status_counts để có số lượng development bugs
+      development_bug_count[status_id] -= count
+    end
+
+    # Tạo dữ liệu cho biểu đồ cột chồng
+    all_status_ids = (development_uat_bug_count.keys + production_bug_count.keys).uniq
+    status_labels = IssueStatus.where(id: all_status_ids).order(:position).pluck(:name)
+    uat_counts = []
+    production_counts = []
+    development_counts = []
+
+    # Chuẩn bị dữ liệu cho từng loại bug theo từng status
+    status_labels.each do |status|
+      status_id = IssueStatus.find_by(name: status).id
+
+      # Lấy số lượng của từng loại bug, mặc định là 0 nếu không có dữ liệu
+      uat_counts << (uat_bug_count[status_id] || 0)
+      production_counts << (production_bug_count[status_id] || 0)
+      development_counts << (development_bug_count[status_id] || 0)
+    end
+
+    # Trả về dữ liệu cho frontend dưới dạng JSON
+    render json: {
+      labels: status_labels,
+      datasets: [
+        {
+          label: 'Development Bugs',
+          data: development_counts,
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',  # Màu cho development bugs
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1
+        },
+        {
+          label: 'UAT Bugs',
+          data: uat_counts,
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',  # Màu cho production bugs
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        },
+        {
+          label: 'Production Bugs',
+          data: production_counts,
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',  # Màu cho UAT bugs
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1
+        },
+      ]
+    }
+  end
+
   def bug_production_not_closed_by_priority_chart_data
     # Lấy tất cả các "status" không được tích chọn "close issue" (ví dụ: trạng thái không có checkbox "close issue")
     # Giả sử có một trường boolean trong bảng "status" tên là "close_issue"
@@ -453,6 +353,114 @@ class AgileMetricsController < ApplicationController
     render json: {
       labels: labels,
       counts: counts
+    }
+  end
+
+  def bug_by_user_story_chart_data
+    # Lấy custom field "Discovery Stage"
+    discovery_stage_field = CustomField.find_by(name: 'Discovery Stage')
+
+    # Kiểm tra nếu custom field "Discovery Stage" không tồn tại
+    if discovery_stage_field.nil?
+      render json: { error: 'Custom Field "Discovery Stage" not found' }, status: :not_found
+      return
+    end
+
+    # Lấy tất cả các issue có tracker là "Bug" và liên kết với các User Stories (issues parent)
+    @bugs = @project.issues.where(tracker: Tracker.find_by(name: 'Bug'), fixed_version: @current_version)
+
+    # Group bugs theo user story (parent issue)
+    @user_stories = @project.issues.where(tracker: Tracker.find_by(name: 'Story'), fixed_version: @current_version)  # Lấy tất cả user stories (issues cha)
+
+    # Lấy các giá trị của "Discovery Stage" (UT, IT, ST, UAT)
+    discovery_stages = discovery_stage_field.possible_values
+    
+    # Lưu trữ dữ liệu số lượng bugs cho từng user story và discovery stage
+    @bug_counts = @user_stories.map do |user_story|
+      # Group bugs của mỗi user story theo Discovery Stage
+      category_counts = discovery_stages.map do |stage|
+        bug_count = @bugs.where(parent_id: user_story.id)
+                        .joins(:custom_values)
+                        .where(custom_values: { custom_field_id: discovery_stage_field.id, value: stage })
+                        .count
+        { stage: stage, count: bug_count }
+      end
+
+      # Đếm bugs mà không có Discovery Stage (null hoặc không có giá trị)
+      other_bug_count = @bugs.where(parent_id: user_story.id)
+                .joins("LEFT JOIN custom_values ON custom_values.customized_id = issues.id AND custom_values.customized_type = 'Issue' AND custom_values.custom_field_id = #{discovery_stage_field.id}")
+                .where("custom_values.value IS NULL OR custom_values.id IS NULL")
+                .count
+
+      # Thêm "Other" vào danh sách Discovery Stage nếu có bugs không có giá trị Discovery Stage
+      category_counts << { stage: 'Discovery Stage not selected', count: other_bug_count }
+
+      { user_story_name: user_story.subject, user_story_id: user_story.id, category_counts: category_counts }
+    end
+
+    # Trả về dữ liệu cho frontend dưới dạng JSON
+    render json: {
+      labels: @bug_counts.map { |data| {id: data[:user_story_id] ,title: data[:user_story_name]} },  # Các user stories
+      datasets: discovery_stages.map do |stage|
+        {
+          label: stage,
+          data: @bug_counts.map { |data| data[:category_counts].find { |c| c[:stage] == stage }[:count] }
+        }
+      end.concat([{  # Thêm dữ liệu cho "Other"
+        label: 'Discovery Stage not selected',
+        data: @bug_counts.map { |data| data[:category_counts].find { |c| c[:stage] == 'Discovery Stage not selected' }[:count] }
+      }])
+    }
+  end
+
+  def bugs_by_problem_category_chart_data
+    # Lấy tất cả các issue có tracker là "Bug" trong project và version hiện tại
+    @bugs = @project.issues.where(tracker: Tracker.find_by(name: 'Bug'), fixed_version: @current_version)
+
+    # Lấy danh sách các giá trị của custom field "Problem Category"
+    problem_category_field = CustomField.find_by(name: 'Problem Category')
+    if problem_category_field.nil?
+      render json: { error: 'Custom Field "Problem Category" not found' }, status: :not_found
+      return
+    end
+
+    discovery_stage_field = CustomField.find_by(name: 'Discovery Stage')
+    # Kiểm tra nếu custom field "Discovery Stage" không tồn tại
+    if discovery_stage_field.nil?
+      render json: { error: 'Custom Field "Discovery Stage" not found' }, status: :not_found
+      return
+    end
+
+    problem_categories = problem_category_field.enumerations.pluck(:id, :name)
+
+    # Đếm số lượng bugs theo từng giá trị của Problem Category
+    @category_counts = problem_categories.map do |category|
+      bug_count = @bugs.joins(:custom_values).where(custom_values: { custom_field_id: problem_category_field.id, value: category[0] }).count
+
+      uat_bug_count = @bugs
+      .joins(:custom_values)  # Inner Join với custom_values
+      .where("custom_values.custom_field_id = ? AND custom_values.value = 'UAT'", discovery_stage_field.id)
+      .or(@project.issues.joins(:custom_values)
+                        .where("custom_values.custom_field_id = ? AND custom_values.value = ?", problem_category_field.id, category[0]))
+      .group("issues.id")  # Nhóm theo bug.id
+      .having("COUNT(issues.id) = 2")  # Lọc bugs có COUNT = 
+
+      { category_name: category[1], dev_bug_count: bug_count - uat_bug_count.length, uat_bug_count: uat_bug_count.length }
+    end
+
+    # Trả về dữ liệu cho frontend
+    render json: {
+      labels: @category_counts.map { |data| data[:category_name] },
+      datasets: [
+        {
+          label: "Development",
+          data: @category_counts.map { |data| data[:dev_bug_count] }
+        },
+        {
+          label: "UAT",
+          data: @category_counts.map { |data| data[:uat_bug_count] }
+        }
+      ]
     }
   end
 
