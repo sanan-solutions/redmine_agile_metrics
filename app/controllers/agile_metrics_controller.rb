@@ -5,7 +5,6 @@ class AgileMetricsController < ApplicationController
   # before_action :authorize  
 
   def index
-    Rails.logger.info ">>> User1: #{User.current.login}"
     # Status By Tracker Pie Chart
     # Danh sách sprint của project (mặc định sắp theo ngày)
     @versions = Version.where(project_id: @project.id)
@@ -43,10 +42,6 @@ class AgileMetricsController < ApplicationController
   end
 
   def get_velocity_chart_data
-    Rails.logger.info "Cookies = #{cookies.to_hash.inspect}"
-    Rails.logger.info ">>> Session keys: #{session.to_hash.keys}"
-    Rails.logger.info ">>> Current user: #{User.current.inspect}"
-    Rails.logger.info ">>> User: #{User.current.login}"
     # Velocity Chart
     @versions = @project.shared_versions.sorted
     velocity_data = @versions.map do |version|
@@ -153,11 +148,10 @@ class AgileMetricsController < ApplicationController
     daily_blocked_counts = Hash.new(0)
     current_date = Date.today
   
-    logger.info "issue ne: #{blocked_issues.inspect}"
     # Duyệt qua tất cả các journal và nhóm theo ngày
     issues_with_blocked_ids.each do |issue|
       date_issue_state_blocked = Hash.new(false)
-      version_range = generate_date_range(@current_version.created_on, @current_version.due_date)
+      version_range = generate_date_range(@current_version.created_on&.to_date, @current_version.due_date)
       version_range.each do |date|
         date_issue_state_blocked[date] = false
       end
@@ -171,15 +165,12 @@ class AgileMetricsController < ApplicationController
 
           journal.details.each do |detail|
             if detail.property == "attr"
-              logger.info "journal date: #{date}"
               date_range.each do |date_item|
                 daily_blocked_counts[date_item] ||= 0
                 if detail.value.to_i == blocked_status_id && date_issue_state_blocked[date_item] == false
-                  logger.info "detail value ne: #{issue.id} value: #{detail.value} date: #{date_item}, count: #{daily_blocked_counts[date_item]}"
                   date_issue_state_blocked[date_item] = true
                   daily_blocked_counts[date_item] += 1 
                 elsif daily_blocked_counts[date_item] > 0 && date_issue_state_blocked[date_item] == true
-                  logger.info "vao tru ne: #{date_item}"
                   date_issue_state_blocked[date_item] = false
                   daily_blocked_counts[date_item] -= 1
                 end
