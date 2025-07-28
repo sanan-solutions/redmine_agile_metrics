@@ -107,14 +107,14 @@ class AgileMetricsController < ApplicationController
   end
 
   def get_active_sprint_velocity_chart_data
-    trackers = Tracker.find_by(name: ['Story', 'Bug - Production'])
+    trackers = Tracker.where(name: ['Story', 'Bug - Production'])
 
     # Commit
-    statuses_commit = IssueStatus.find_by(name: ['Committed In Sprint', 'Done Development', 'UAT', 'UAT Feedback', 'Done', 'Wait For Release', "Closed"])
+    statuses_commit = IssueStatus.where(name: ['Committed In Sprint', 'Done Development', 'UAT', 'UAT Feedback', 'Done'])
     commit_data = get_active_sprint_sp_data(trackers, statuses_commit)
 
     # Done
-    statuses_done = IssueStatus.find_by(name: ['Done','Wait For Release', 'Closed'])
+    statuses_done = IssueStatus.find_by(name: ['Done'])
     done_data = get_active_sprint_sp_data(trackers, statuses_done)
 
     render json: {

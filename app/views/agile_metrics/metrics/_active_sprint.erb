@@ -10,7 +10,7 @@
       <b>Description: </b><%= @current_version&.description %>
     </div>
     <div>
-      <b>Thời gian bắt đầu: </b><%= @current_version&.created_on %>
+      <b>Thời gian bắt đầu: </b><%= @current_version&.created_on&.to_date %>
     </div>
     <div>
       <b>Thời gian kết thúc: </b><%= @current_version&.effective_date %>
