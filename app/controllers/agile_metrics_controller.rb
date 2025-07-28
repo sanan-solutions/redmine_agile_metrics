@@ -84,7 +84,7 @@ class AgileMetricsController < ApplicationController
   def get_active_sprint_sp_data(trackers, statuses)
     sp_team = @project.issues
     .joins(:agile_data)
-    .where(tracker: trackers, fixed_version: current_version)
+    .where(tracker: trackers, fixed_version: @current_version)
     .where(status: statuses)
     .sum('agile_data.story_points')
 
@@ -142,7 +142,7 @@ class AgileMetricsController < ApplicationController
       .joins(:journals)
       .joins("INNER JOIN journal_details ON journal_details.journal_id = journals.id")
       .where(journal_details: { property: 'attr', value: blocked_status_id })  # Lọc theo trạng thái "Blocked"
-      .where('journals.created_on BETWEEN ? AND ?', @current_version.start_date, @current_version.due_date)  # Lọc theo thời gian trong version
+      .where('journals.created_on BETWEEN ? AND ?', @current_version.created_on, @current_version.due_date)  # Lọc theo thời gian trong version
 
     blocked_issue_ids = blocked_issues.pluck(:id)
 
@@ -157,7 +157,7 @@ class AgileMetricsController < ApplicationController
     # Duyệt qua tất cả các journal và nhóm theo ngày
     issues_with_blocked_ids.each do |issue|
       date_issue_state_blocked = Hash.new(false)
-      version_range = generate_date_range(@current_version.start_date, @current_version.due_date)
+      version_range = generate_date_range(@current_version.created_on, @current_version.due_date)
       version_range.each do |date|
         date_issue_state_blocked[date] = false
       end
@@ -230,7 +230,7 @@ class AgileMetricsController < ApplicationController
   def get_burndown_chart_data
     @issues = @current_version.fixed_issues
     options = { 
-      date_from: @current_version.start_date,
+      date_from: @current_version.created_on,
       date_to: @current_version.due_date,
       due_date: @current_version.due_date,
       chart_unit: params[:chart_unit] 
@@ -470,7 +470,7 @@ class AgileMetricsController < ApplicationController
         version_id: @current_version.id,
         version_name: @current_version.name,
         description: @current_version.description,
-        start_date: @current_version.start_date,
+        start_date: @current_version.created_on,
         effective_date: @current_version.effective_date,
         due_date: @current_version.due_date,
         status: @current_version.status,
